@@ -404,6 +404,7 @@ end
 sgs.ai_use_value.Wangshui = 6.5
 sgs.ai_use_priority.Wangshui = 4.35
 sgs.ai_keep_value.Wangshui = 3.3
+sgs.ai_card_intention.FireAttack = 100
 
 function SmartAI:useCardSizao(sizao, use)
 	if self.room:isProhibited(self.player, self.player, sizao) then return end
@@ -469,6 +470,7 @@ end
 sgs.ai_use_value.Sizao = 4.1
 sgs.ai_use_priority.Sizao = 3.11
 sgs.ai_keep_value.Sizao = 3.47
+sgs.ai_card_intention.FireAttack = 110
 
 function SmartAI:useCardLengning(card, use)
 	if self.room:isProhibited(self.player, self.player, card) then return end
@@ -716,6 +718,7 @@ sgs.ai_choicemade_filter.cardChosen.lengning = sgs.ai_choicemade_filter.cardChos
 sgs.ai_use_value.Lengning = 8
 sgs.ai_use_priority.Lengning = 4.44
 sgs.ai_keep_value.Lengning = 3.51
+sgs.ai_card_intention.Lengning = 100
 
 function SmartAI:useCardLaman(card, use)
 	if self.room:isProhibited(self.player, self.player, card) then return end
@@ -783,6 +786,7 @@ end
 sgs.ai_use_value.Laman = 8
 sgs.ai_use_priority.Laman = 5.67
 sgs.ai_keep_value.Laman = 3.38
+sgs.ai_card_intention.FireAttack = 100
 
 function SmartAI:willUseJieziqi(card)
 	if not card then self.room:writeToConsole(debug.traceback()) return false end
@@ -910,7 +914,7 @@ function SmartAI:useCardFireup(fire_attack, use)
 
 	local enemies, targets = {}, {}
 	for _, enemy in ipairs(self.enemies) do
-		if (not use.current_targets or not table.contains(use.current_targets, enemy:objectName())) and can_attack(enemy) then
+		if (not use.current_targets or not table.contains(use.current_targets, enemy:objectName())) and can_attack(enemy) and (not enemy:isNude()) then
 			table.insert(enemies, enemy)
 		end
 	end
@@ -1034,6 +1038,7 @@ end
 sgs.ai_use_value.Fireup = 5.12
 sgs.ai_keep_value.Fireup = 3.46
 sgs.ai_use_priority.Fireup = sgs.ai_use_priority.FireAttack + 0.1
+sgs.ai_card_intention.Fireup = 90
 
 function SmartAI:useCardEjump(card, use)
 	if self.player:getHandcardNum() > self.player:getHp() then
@@ -1394,6 +1399,7 @@ function SmartAI:useCardAllocate(card, use)
 	if self.player:hasSkill("manjuan") then return nil end
 	self:sort(friends, "defense", true)
 	for _, friend in ipairs(friends) do
+		if friend:isKongcheng() then continue end
 		if friend:hasSkill("enyuan") then
 			gongmou_target = friend
 		elseif friend:hasSkill("manjuan") then
@@ -1404,7 +1410,7 @@ function SmartAI:useCardAllocate(card, use)
 	self:sort(enemies, "defense", true)
 	for _, enemy in ipairs(enemies) do
 		if gongmou_target then break end
-		if not self:needKongcheng(enemy) and not self:hasSkills("manjuan|qiaobian", enemy) then
+		if (not enemy:isKongcheng()) and not self:needKongcheng(enemy) and not self:hasSkills("manjuan|qiaobian", enemy) then
 			gongmou_target = enemy
 		end
 	end
@@ -1434,7 +1440,32 @@ sgs.ai_use_value.Allocate = 5.1
 sgs.ai_keep_value.Allocate = 3.33
 sgs.ai_use_priority.Allocate = 7.7
 
-local science = {"weile","houdebang","lawaxi","huangminglong","msjuli","baichuan","nuobeier","daoerdun","menjieliefu","david","shele","mulis","nash","fuke","mitena","wosenklk","ndgirl","jialowa","yuanlongping","fiman","zuchongzhi","akubr","borzm","tesla","yinssk","eldes","kaipl","stevens","hodgkin","hesmu"}
+function SmartAI:useCardDrosophila(card, use)
+	local arr1, arr2 = self:getWoundedFriend(false, true)
+	local target = nil
+
+	if #arr1 > 0 and arr1[1]:getHp() < getBestHp(arr1[1]) and not(arr1[1]:hasSkill("manjuan") and arr1[1]:getHp()>1) then target = arr1[1] end
+	if target then
+		use.card = card
+		if use.to then use.to:append(target) end
+		return
+	end
+	if #arr2 > 0 then
+		for _, friend in ipairs(arr2) do
+			if not friend:hasSkills("hunzi|longhun|manjuan") then
+				use.card = card
+				if use.to then use.to:append(friend) end
+				return
+			end
+		end
+	end
+end
+sgs.ai_use_value.Drosophila = 7.9
+sgs.ai_keep_value.Drosophila = 4.33
+sgs.ai_use_priority.Drosophila = 3.56
+
+
+local science = {"weile","houdebang","lawaxi","huangminglong","msjuli","baichuan","nuobeier","daoerdun","menjieliefu","david","shele","mulis","nash","fuke","mitena","wosenklk","ndgirl","jialowa","yuanlongping","fiman","zuchongzhi","akubr","borzm","tesla","yinssk","eldes","kaipl","stevens","hodgkin","hesmu","karvin","morton","ebhaus","lipum","bonuli","boer","keluolf","adamsmi","lidaoyuan","chenyinke","linhuiyin","adlovelace","morgan","zhangailin"}
 
 IOoutput = function(output)
 	assert(type(output) == "string")
@@ -2221,6 +2252,12 @@ function sgs.ai_armor_value.lengjing(player, self)
 		return 4.5 + getKnownCard(player, self.player, "black", false, "he") + 1
 	end
 	return 4.5 + getKnownCard(player, self.player, "black", false, "he")
+end
+
+sgs.ai_skill_choice.drosophila = function(self, choice)
+	if self.player:getHp() < self.player:getMaxHp() then return "recover" end
+	if self:needKongcheng(self.player, true) then return "recover" end
+	return "draw"
 end
 
 local tongfenyigou_skill={}
@@ -5677,7 +5714,7 @@ function SmartAI:damageIsEffective_(damageStruct)
 	local jinxuandi = self.room:findPlayerBySkillName("wuling")
 	if jinxuandi and jinxuandi:getMark("@fire") > 0 then nature = sgs.DamageStruct_Fire end
 
-	if to:hasSkill("shenjun") and to:getGender() ~= from:getGender() and nature ~= sgs.DamageStruct_Thunder then
+	if to and to:hasSkill("shenjun") and to:getGender() ~= from:getGender() and nature ~= sgs.DamageStruct_Thunder then
 		return false
 	end
 	if to:getMark("@fenyong") > 0 and to:hasSkill("fenyong")  then
